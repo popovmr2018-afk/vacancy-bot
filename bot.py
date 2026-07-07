@@ -137,10 +137,10 @@ async def main():
 phone_number = os.getenv('PHONE_NUMBER', '89021445391')
 await client.start(phone=phone_number)
 
-    while True:
-        await check_once(client)
-        print("⏳ Следующая проверка через час...")
-        await asyncio.sleep(CHECK_INTERVAL)
+while True:
+    await check_once(client)
+    print("⏳ Следующая проверка через час...")
+    await asyncio.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     asyncio.run(main())
