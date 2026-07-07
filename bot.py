@@ -35,11 +35,8 @@ EXCLUDE_KEYWORDS = [
     "опыт от 3", "опыт от 5", "стаж от 3", "стаж от 5",
 ]
 SENT_FILE = "sent_vacancies.json"
-CHECK_INTERVAL = 3600  # каждый час
+CHECK_INTERVAL = 3600
 
-# ============================================================
-# ФУНКЦИИ
-# ============================================================
 def load_sent() -> set:
     if os.path.exists(SENT_FILE):
         with open(SENT_FILE, "r") as f:
