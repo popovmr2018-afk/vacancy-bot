@@ -1,9 +1,8 @@
 """
 ========================================
-  КАРМАН СТУДЕНТА — Парсер вакансий
+ КАРМАН СТУДЕНТА — Парсер вакансий
 ========================================
 """
-
 import asyncio
 import json
 import os
@@ -13,21 +12,17 @@ import requests
 from telethon import TelegramClient
 
 # ============================================================
-#  НАСТРОЙКИ
+# НАСТРОЙКИ
 # ============================================================
-
-BOT_TOKEN  = "8474485805:AAFbTDADlq2tFXKWcWNa5GIzS_Y4NfOLI88"  # ⚠️ Вставь новый токен от @BotFather
+BOT_TOKEN = "8474485805:AAFbTDADlq2tFXKWcWNa5GIzS_Y4NfOLI88"
 MY_CHAT_ID = 5054407561
-
-API_ID   = 2040
+API_ID = 2040
 API_HASH = "b18441a1ff607e10a989891a5462e627"
-
 SOURCE_CHATS = [
     "muravey_100",
     "personnelnskchas",
     "rabota154NsK",
 ]
-
 KEYWORDS = [
     "подработка", "подработать", "студент", "студентам",
     "part-time", "неполный день", "гибкий график",
@@ -36,18 +31,15 @@ KEYWORDS = [
     "кассир", "официант", "бармен", "репетитор",
     "няня", "помощник", "грузчик", "упаковщик",
 ]
-
 EXCLUDE_KEYWORDS = [
     "опыт от 3", "опыт от 5", "стаж от 3", "стаж от 5",
 ]
-
 SENT_FILE = "sent_vacancies.json"
 CHECK_INTERVAL = 3600  # каждый час
 
 # ============================================================
-#  ФУНКЦИИ
+# ФУНКЦИИ
 # ============================================================
-
 def load_sent() -> set:
     if os.path.exists(SENT_FILE):
         with open(SENT_FILE, "r") as f:
@@ -82,7 +74,7 @@ def format_vacancy(text: str, chat: str, date: datetime, num: int) -> str:
     date_str = date.strftime("%d.%m %H:%M")
     preview = text[:800] + ("..." if len(text) > 800 else "")
     return (
-        f"💼 <b>Вакансия #{num}</b>  |  {date_str}\n"
+        f"💼 <b>Вакансия #{num}</b> | {date_str}\n"
         f"📢 @{chat}\n"
         f"{'─' * 30}\n"
         f"{preview}"
@@ -92,7 +84,7 @@ async def check_once(client: TelegramClient):
     sent = load_sent()
     since = datetime.now(timezone.utc) - timedelta(hours=1)
     new_vacancies = []
-
+    
     for chat in SOURCE_CHATS:
         try:
             print(f"🔍 Читаю @{chat}...")
@@ -109,7 +101,7 @@ async def check_once(client: TelegramClient):
                     new_vacancies.append((msg.text, chat, msg.date, h))
         except Exception as e:
             print(f"⚠️ Ошибка с @{chat}: {e}")
-
+    
     if new_vacancies:
         send_to_me(
             f"🕐 <b>Подборка вакансий</b> — {datetime.now().strftime('%d.%m %H:%M')}\n"
@@ -131,16 +123,15 @@ async def main():
         "Буду присылать вакансии каждый час.\n"
         f"Слежу за: {', '.join('@' + c for c in SOURCE_CHATS)}"
     )
+    
+    phone_number = os.getenv('PHONE_NUMBER', '89021445391')
     client = TelegramClient("vacancy_session", API_ID, API_HASH)
-    import os
-
-phone_number = os.getenv('PHONE_NUMBER', '89021445391')
-await client.start(phone=phone_number)
-
-while True:
-    await check_once(client)
-    print("⏳ Следующая проверка через час...")
-    await asyncio.sleep(CHECK_INTERVAL)
+    await client.start(phone=phone_number)
+    
+    while True:
+        await check_once(client)
+        print("⏳ Следующая проверка через час...")
+        await asyncio.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     asyncio.run(main())
