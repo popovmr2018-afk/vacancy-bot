@@ -132,7 +132,10 @@ async def main():
         f"Слежу за: {', '.join('@' + c for c in SOURCE_CHATS)}"
     )
     client = TelegramClient("vacancy_session", API_ID, API_HASH)
-    await client.start()
+    import os
+
+phone_number = os.getenv('PHONE_NUMBER', '89021445391')
+await client.start(phone=phone_number)
 
     while True:
         await check_once(client)
