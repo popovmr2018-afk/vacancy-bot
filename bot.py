@@ -10,6 +10,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 import requests
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 
 # ============================================================
 # НАСТРОЙКИ
@@ -18,6 +19,9 @@ BOT_TOKEN = "8474485805:AAFbTDADlq2tFXKWcWNa5GIzS_Y4NfOLI88"
 MY_CHAT_ID = 5054407561
 API_ID = 2040
 API_HASH = "b18441a1ff607e10a989891a5462e627"
+SESSION_STRING = os.getenv('SESSION_STRING', '')
+PHONE_NUMBER = os.getenv('PHONE_NUMBER', '89021445391')
+
 SOURCE_CHATS = [
     "muravey_100",
     "personnelnskchas",
@@ -37,6 +41,9 @@ EXCLUDE_KEYWORDS = [
 SENT_FILE = "sent_vacancies.json"
 CHECK_INTERVAL = 3600
 
+# ============================================================
+# ФУНКЦИИ
+# ============================================================
 def load_sent() -> set:
     if os.path.exists(SENT_FILE):
         with open(SENT_FILE, "r") as f:
@@ -115,20 +122,29 @@ async def check_once(client: TelegramClient):
 
 async def main():
     print("🚀 Парсер запущен!")
+    
+    if not SESSION_STRING:
+        print("❌ SESSION_STRING не установлена!")
+        send_to_me("❌ <b>Ошибка:</b> SESSION_STRING не установлена. Запусти скрипт генерации сессии.")
+        return
+    
     send_to_me(
         "🚀 <b>Карман студента — парсер запущен!</b>\n"
         "Буду присылать вакансии каждый час.\n"
         f"Слежу за: {', '.join('@' + c for c in SOURCE_CHATS)}"
     )
     
-    phone_number = os.getenv('PHONE_NUMBER', '89021445391')
-    client = TelegramClient("vacancy_session", API_ID, API_HASH)
-    await client.start(phone=phone_number)
+    client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
+    await client.connect()
     
     while True:
-        await check_once(client)
-        print("⏳ Следующая проверка через час...")
-        await asyncio.sleep(CHECK_INTERVAL)
+        try:
+            await check_once(client)
+            print("⏳ Следующая проверка через час...")
+            await asyncio.sleep(CHECK_INTERVAL)
+        except Exception as e:
+            print(f"❌ Ошибка в основном цикле: {e}")
+            await asyncio.sleep(60)
 
 if __name__ == "__main__":
     asyncio.run(main())
