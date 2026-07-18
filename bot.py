@@ -49,7 +49,7 @@ def send_to_me(text):
 
 def format_msg(text, chat, date, num):
     date_str = date.strftime("%d.%m %H:%M")
-    preview = text[:800] + ("..." if len(text) > 800 else "")
+   preview = text[:4000] + ("..." if len(text) > 4000 else "")
     return (
         f"<b>#{num}</b>  |  {date_str}\n"
         f"@{chat}\n"
