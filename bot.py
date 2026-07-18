@@ -21,7 +21,7 @@ SOURCE_CHATS = [
 ]
 
 SENT_FILE = "/tmp/sent_vacancies.json"
-CHECK_INTERVAL = 1800
+CHECK_INTERVAL = 1800  # каждые 30 минут
 
 def load_sent():
     if os.path.exists(SENT_FILE):
@@ -31,7 +31,7 @@ def load_sent():
 
 def save_sent(sent):
     with open(SENT_FILE, "w") as f:
-        json.dump(list(sent)[-5000:], f)
+        json.dump(list(sent)[-10000:], f)
 
 def get_hash(text):
     return hashlib.md5(text.strip().encode()).hexdigest()
@@ -59,16 +59,14 @@ def format_msg(text, chat, date, num):
 
 async def check_once(client):
     sent = load_sent()
-    since = datetime.now(timezone.utc) - timedelta(hours=1)
     new_msgs = []
 
     for chat in SOURCE_CHATS:
         try:
             print(f"Читаю @{chat}...")
             entity = await client.get_entity(chat)
-            async for msg in client.iter_messages(entity, limit=200):
-                if msg.date < since:
-                    break
+            # Берём все сообщения без ограничения по времени
+            async for msg in client.iter_messages(entity, limit=500):
                 if not msg.text:
                     continue
                 h = get_hash(msg.text)
@@ -80,8 +78,8 @@ async def check_once(client):
 
     if new_msgs:
         send_to_me(
-            f"<b>Подборка за {datetime.now().strftime('%d.%m %H:%M')}</b>\n"
-            f"Новых сообщений: <b>{len(new_msgs)}</b>"
+            f"<b>Подборка {datetime.now().strftime('%d.%m %H:%M')}</b>\n"
+            f"Новых: <b>{len(new_msgs)}</b>"
         )
         for i, (text, chat, date, h) in enumerate(new_msgs, 1):
             send_to_me(format_msg(text, chat, date, i))
@@ -93,8 +91,6 @@ async def check_once(client):
         print("Новых сообщений нет")
 
 async def main():
-    print(f"SESSION_STRING задана: {bool(SESSION_STRING)}")
-
     if not SESSION_STRING:
         send_to_me("ОШИБКА: SESSION_STRING не задана!")
         return
@@ -108,11 +104,11 @@ async def main():
         return
 
     print("Подключились успешно!")
-    send_to_me("Парсер запущен! Буду присылать все новые сообщения каждый час без повторов.")
+    send_to_me("Парсер запущен! Рассылка каждые 30 минут, без повторов.")
 
     while True:
         await check_once(client)
-        print("Следующая проверка через час...")
+        print("Следующая проверка через 30 минут...")
         await asyncio.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
