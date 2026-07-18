@@ -21,7 +21,7 @@ SOURCE_CHATS = [
 ]
 
 SENT_FILE = "/tmp/sent_vacancies.json"
-CHECK_INTERVAL = 1800  # каждые 30 минут
+CHECK_INTERVAL = 1800
 
 def load_sent():
     if os.path.exists(SENT_FILE):
@@ -49,13 +49,20 @@ def send_to_me(text):
 
 def format_msg(text, chat, date, num):
     date_str = date.strftime("%d.%m %H:%M")
-   preview = text[:4000] + ("..." if len(text) > 4000 else "")
-    return (
-        f"<b>#{num}</b>  |  {date_str}\n"
-        f"@{chat}\n"
-        f"{'─' * 30}\n"
-        f"{preview}"
-    )
+    # Если текст длиннее 4000 — разбиваем на части
+    header = f"<b>#{num}</b>  |  {date_str}\n@{chat}\n{'─' * 30}\n"
+    full = header + text
+    parts = []
+    # Первая часть с заголовком
+    if len(full) <= 4000:
+        parts.append(full)
+    else:
+        parts.append(full[:4000])
+        remaining = full[4000:]
+        while remaining:
+            parts.append(remaining[:4000])
+            remaining = remaining[4000:]
+    return parts
 
 async def check_once(client):
     sent = load_sent()
@@ -65,7 +72,6 @@ async def check_once(client):
         try:
             print(f"Читаю @{chat}...")
             entity = await client.get_entity(chat)
-            # Берём все сообщения без ограничения по времени
             async for msg in client.iter_messages(entity, limit=500):
                 if not msg.text:
                     continue
@@ -82,7 +88,10 @@ async def check_once(client):
             f"Новых: <b>{len(new_msgs)}</b>"
         )
         for i, (text, chat, date, h) in enumerate(new_msgs, 1):
-            send_to_me(format_msg(text, chat, date, i))
+            parts = format_msg(text, chat, date, i)
+            for part in parts:
+                send_to_me(part)
+                await asyncio.sleep(0.5)
             sent.add(h)
             await asyncio.sleep(1)
         save_sent(sent)
@@ -104,7 +113,7 @@ async def main():
         return
 
     print("Подключились успешно!")
-    send_to_me("Парсер запущен! Рассылка каждые 30 минут, без повторов.")
+    send_to_me("Парсер запущен! Рассылка каждые 30 минут, без повторов, полные сообщения.")
 
     while True:
         await check_once(client)
