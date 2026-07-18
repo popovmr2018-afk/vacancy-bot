@@ -1,9 +1,3 @@
-"""
-========================================
-  КАРМАН СТУДЕНТА — Парсер вакансий
-========================================
-"""
-
 import asyncio
 import json
 import os
@@ -12,10 +6,6 @@ from datetime import datetime, timedelta, timezone
 import requests
 from telethon import TelegramClient
 from telethon.sessions import StringSession
-
-# ============================================================
-#  НАСТРОЙКИ — берём из переменных окружения Railway
-# ============================================================
 
 BOT_TOKEN      = os.environ.get("BOT_TOKEN", "")
 MY_CHAT_ID     = int(os.environ.get("MY_CHAT_ID", "5054407561"))
@@ -46,24 +36,20 @@ EXCLUDE_KEYWORDS = [
 SENT_FILE = "/tmp/sent_vacancies.json"
 CHECK_INTERVAL = 3600
 
-# ============================================================
-#  ФУНКЦИИ
-# ============================================================
-
-def load_sent() -> set:
+def load_sent():
     if os.path.exists(SENT_FILE):
         with open(SENT_FILE, "r") as f:
             return set(json.load(f))
     return set()
 
-def save_sent(sent: set):
+def save_sent(sent):
     with open(SENT_FILE, "w") as f:
         json.dump(list(sent)[-5000:], f)
 
-def get_hash(text: str) -> str:
+def get_hash(text):
     return hashlib.md5(text.strip().encode()).hexdigest()
 
-def send_to_me(text: str):
+def send_to_me(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
         requests.post(url, json={
@@ -74,30 +60,30 @@ def send_to_me(text: str):
     except Exception as e:
         print(f"Ошибка отправки: {e}")
 
-def is_vacancy(text: str) -> bool:
+def is_vacancy(text):
     t = text.lower()
     if any(w.lower() in t for w in EXCLUDE_KEYWORDS):
         return False
     return any(w.lower() in t for w in KEYWORDS)
 
-def format_vacancy(text: str, chat: str, date: datetime, num: int) -> str:
+def format_vacancy(text, chat, date, num):
     date_str = date.strftime("%d.%m %H:%M")
     preview = text[:800] + ("..." if len(text) > 800 else "")
     return (
-        f"💼 <b>Вакансия #{num}</b>  |  {date_str}\n"
-        f"📢 @{chat}\n"
+        f"<b>Вакансия #{num}</b>  |  {date_str}\n"
+        f"@{chat}\n"
         f"{'─' * 30}\n"
         f"{preview}"
     )
 
-async def check_once(client: TelegramClient):
+async def check_once(client):
     sent = load_sent()
     since = datetime.now(timezone.utc) - timedelta(hours=1)
     new_vacancies = []
 
     for chat in SOURCE_CHATS:
         try:
-            print(f"🔍 Читаю @{chat}...")
+            print(f"Читаю @{chat}...")
             entity = await client.get_entity(chat)
             async for msg in client.iter_messages(entity, limit=100):
                 if msg.date < since:
@@ -110,41 +96,49 @@ async def check_once(client: TelegramClient):
                 if is_vacancy(msg.text):
                     new_vacancies.append((msg.text, chat, msg.date, h))
         except Exception as e:
-            print(f"⚠️ Ошибка с @{chat}: {e}")
+            print(f"Ошибка с @{chat}: {e}")
 
     if new_vacancies:
         send_to_me(
-            f"🕐 <b>Подборка вакансий</b> — {datetime.now().strftime('%d.%m %H:%M')}\n"
-            f"Новых вакансий: <b>{len(new_vacancies)}</b>"
+            f"<b>Подборка вакансий</b> — {datetime.now().strftime('%d.%m %H:%M')}\n"
+            f"Новых: <b>{len(new_vacancies)}</b>"
         )
         for i, (text, chat, date, h) in enumerate(new_vacancies, 1):
             send_to_me(format_vacancy(text, chat, date, i))
             sent.add(h)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1)
         save_sent(sent)
-        print(f"✅ Отправлено: {len(new_vacancies)}")
+        print(f"Отправлено: {len(new_vacancies)}")
     else:
-        print("ℹ️ Новых вакансий нет")
+        print("Новых вакансий нет")
 
 async def main():
+    print(f"SESSION_STRING задана: {bool(SESSION_STRING)}")
+    print(f"Длина SESSION_STRING: {len(SESSION_STRING)}")
+
     if not SESSION_STRING:
-        print("❌ SESSION_STRING не задана!")
-        send_to_me("❌ Ошибка: SESSION_STRING не задана в переменных Railway!")
+        print("ОШИБКА: SESSION_STRING не задана!")
+        send_to_me("ОШИБКА: SESSION_STRING не задана в переменных Railway!")
         return
 
-    print("🚀 Парсер запущен!")
-    send_to_me(
-        "🚀 <b>Карман студента — парсер запущен!</b>\n"
-        "Буду присылать вакансии каждый час.\n"
-        f"Слежу за: {', '.join('@' + c for c in SOURCE_CHATS)}"
-    )
-
+    print("Подключаемся через StringSession...")
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
     await client.connect()
 
+    is_auth = await client.is_user_authorized()
+    print(f"Авторизован: {is_auth}")
+
+    if not is_auth:
+        print("ОШИБКА: Сессия невалидна!")
+        send_to_me("ОШИБКА: Сессия невалидна! Нужно сгенерировать SESSION_STRING заново.")
+        return
+
+    print("Успешно подключились!")
+    send_to_me("Парсер запущен! Буду присылать вакансии каждый час.")
+
     while True:
         await check_once(client)
-        print("⏳ Следующая проверка через час...")
+        print("Следующая проверка через час...")
         await asyncio.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
