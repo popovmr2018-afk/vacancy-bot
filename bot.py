@@ -20,19 +20,6 @@ SOURCE_CHATS = [
     "rabota154NsK",
 ]
 
-KEYWORDS = [
-    "подработка", "подработать", "студент", "студентам",
-    "part-time", "неполный день", "гибкий график",
-    "свободный график", "курьер", "промоутер", "аниматор",
-    "расклейщик", "раздача", "опрос", "анкетирование",
-    "кассир", "официант", "бармен", "репетитор",
-    "няня", "помощник", "грузчик", "упаковщик",
-]
-
-EXCLUDE_KEYWORDS = [
-    "опыт от 3", "опыт от 5", "стаж от 3", "стаж от 5",
-]
-
 SENT_FILE = "/tmp/sent_vacancies.json"
 CHECK_INTERVAL = 3600
 
@@ -60,17 +47,11 @@ def send_to_me(text):
     except Exception as e:
         print(f"Ошибка отправки: {e}")
 
-def is_vacancy(text):
-    t = text.lower()
-    if any(w.lower() in t for w in EXCLUDE_KEYWORDS):
-        return False
-    return any(w.lower() in t for w in KEYWORDS)
-
-def format_vacancy(text, chat, date, num):
+def format_msg(text, chat, date, num):
     date_str = date.strftime("%d.%m %H:%M")
     preview = text[:800] + ("..." if len(text) > 800 else "")
     return (
-        f"<b>Вакансия #{num}</b>  |  {date_str}\n"
+        f"<b>#{num}</b>  |  {date_str}\n"
         f"@{chat}\n"
         f"{'─' * 30}\n"
         f"{preview}"
@@ -79,13 +60,13 @@ def format_vacancy(text, chat, date, num):
 async def check_once(client):
     sent = load_sent()
     since = datetime.now(timezone.utc) - timedelta(hours=1)
-    new_vacancies = []
+    new_msgs = []
 
     for chat in SOURCE_CHATS:
         try:
             print(f"Читаю @{chat}...")
             entity = await client.get_entity(chat)
-            async for msg in client.iter_messages(entity, limit=100):
+            async for msg in client.iter_messages(entity, limit=200):
                 if msg.date < since:
                     break
                 if not msg.text:
@@ -93,48 +74,41 @@ async def check_once(client):
                 h = get_hash(msg.text)
                 if h in sent:
                     continue
-                if is_vacancy(msg.text):
-                    new_vacancies.append((msg.text, chat, msg.date, h))
+                new_msgs.append((msg.text, chat, msg.date, h))
         except Exception as e:
             print(f"Ошибка с @{chat}: {e}")
 
-    if new_vacancies:
+    if new_msgs:
         send_to_me(
-            f"<b>Подборка вакансий</b> — {datetime.now().strftime('%d.%m %H:%M')}\n"
-            f"Новых: <b>{len(new_vacancies)}</b>"
+            f"<b>Подборка за {datetime.now().strftime('%d.%m %H:%M')}</b>\n"
+            f"Новых сообщений: <b>{len(new_msgs)}</b>"
         )
-        for i, (text, chat, date, h) in enumerate(new_vacancies, 1):
-            send_to_me(format_vacancy(text, chat, date, i))
+        for i, (text, chat, date, h) in enumerate(new_msgs, 1):
+            send_to_me(format_msg(text, chat, date, i))
             sent.add(h)
             await asyncio.sleep(1)
         save_sent(sent)
-        print(f"Отправлено: {len(new_vacancies)}")
+        print(f"Отправлено: {len(new_msgs)}")
     else:
-        print("Новых вакансий нет")
+        print("Новых сообщений нет")
 
 async def main():
     print(f"SESSION_STRING задана: {bool(SESSION_STRING)}")
-    print(f"Длина SESSION_STRING: {len(SESSION_STRING)}")
 
     if not SESSION_STRING:
-        print("ОШИБКА: SESSION_STRING не задана!")
-        send_to_me("ОШИБКА: SESSION_STRING не задана в переменных Railway!")
+        send_to_me("ОШИБКА: SESSION_STRING не задана!")
         return
 
-    print("Подключаемся через StringSession...")
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
     await client.connect()
 
     is_auth = await client.is_user_authorized()
-    print(f"Авторизован: {is_auth}")
-
     if not is_auth:
-        print("ОШИБКА: Сессия невалидна!")
-        send_to_me("ОШИБКА: Сессия невалидна! Нужно сгенерировать SESSION_STRING заново.")
+        send_to_me("ОШИБКА: Сессия невалидна!")
         return
 
-    print("Успешно подключились!")
-    send_to_me("Парсер запущен! Буду присылать вакансии каждый час.")
+    print("Подключились успешно!")
+    send_to_me("Парсер запущен! Буду присылать все новые сообщения каждый час без повторов.")
 
     while True:
         await check_once(client)
