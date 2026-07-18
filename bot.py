@@ -1,8 +1,9 @@
 """
 ========================================
- КАРМАН СТУДЕНТА — Парсер вакансий
+  КАРМАН СТУДЕНТА — Парсер вакансий
 ========================================
 """
+
 import asyncio
 import json
 import os
@@ -13,20 +14,22 @@ from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 # ============================================================
-# НАСТРОЙКИ
+#  НАСТРОЙКИ — берём из переменных окружения Railway
 # ============================================================
-BOT_TOKEN = "8474485805:AAFbTDADlq2tFXKWcWNa5GIzS_Y4NfOLI88"
-MY_CHAT_ID = 5054407561
-API_ID = 2040
+
+BOT_TOKEN      = os.environ.get("BOT_TOKEN", "")
+MY_CHAT_ID     = int(os.environ.get("MY_CHAT_ID", "5054407561"))
+SESSION_STRING = os.environ.get("SESSION_STRING", "")
+
+API_ID   = 2040
 API_HASH = "b18441a1ff607e10a989891a5462e627"
-SESSION_STRING = os.getenv('SESSION_STRING', '')
-PHONE_NUMBER = os.getenv('PHONE_NUMBER', '89021445391')
 
 SOURCE_CHATS = [
     "muravey_100",
     "personnelnskchas",
     "rabota154NsK",
 ]
+
 KEYWORDS = [
     "подработка", "подработать", "студент", "студентам",
     "part-time", "неполный день", "гибкий график",
@@ -35,15 +38,18 @@ KEYWORDS = [
     "кассир", "официант", "бармен", "репетитор",
     "няня", "помощник", "грузчик", "упаковщик",
 ]
+
 EXCLUDE_KEYWORDS = [
     "опыт от 3", "опыт от 5", "стаж от 3", "стаж от 5",
 ]
-SENT_FILE = "sent_vacancies.json"
+
+SENT_FILE = "/tmp/sent_vacancies.json"
 CHECK_INTERVAL = 3600
 
 # ============================================================
-# ФУНКЦИИ
+#  ФУНКЦИИ
 # ============================================================
+
 def load_sent() -> set:
     if os.path.exists(SENT_FILE):
         with open(SENT_FILE, "r") as f:
@@ -78,7 +84,7 @@ def format_vacancy(text: str, chat: str, date: datetime, num: int) -> str:
     date_str = date.strftime("%d.%m %H:%M")
     preview = text[:800] + ("..." if len(text) > 800 else "")
     return (
-        f"💼 <b>Вакансия #{num}</b> | {date_str}\n"
+        f"💼 <b>Вакансия #{num}</b>  |  {date_str}\n"
         f"📢 @{chat}\n"
         f"{'─' * 30}\n"
         f"{preview}"
@@ -88,7 +94,7 @@ async def check_once(client: TelegramClient):
     sent = load_sent()
     since = datetime.now(timezone.utc) - timedelta(hours=1)
     new_vacancies = []
-    
+
     for chat in SOURCE_CHATS:
         try:
             print(f"🔍 Читаю @{chat}...")
@@ -105,7 +111,7 @@ async def check_once(client: TelegramClient):
                     new_vacancies.append((msg.text, chat, msg.date, h))
         except Exception as e:
             print(f"⚠️ Ошибка с @{chat}: {e}")
-    
+
     if new_vacancies:
         send_to_me(
             f"🕐 <b>Подборка вакансий</b> — {datetime.now().strftime('%d.%m %H:%M')}\n"
@@ -121,30 +127,25 @@ async def check_once(client: TelegramClient):
         print("ℹ️ Новых вакансий нет")
 
 async def main():
-    print("🚀 Парсер запущен!")
-    
     if not SESSION_STRING:
-        print("❌ SESSION_STRING не установлена!")
-        send_to_me("❌ <b>Ошибка:</b> SESSION_STRING не установлена. Запусти скрипт генерации сессии.")
+        print("❌ SESSION_STRING не задана!")
+        send_to_me("❌ Ошибка: SESSION_STRING не задана в переменных Railway!")
         return
-    
+
+    print("🚀 Парсер запущен!")
     send_to_me(
         "🚀 <b>Карман студента — парсер запущен!</b>\n"
         "Буду присылать вакансии каждый час.\n"
         f"Слежу за: {', '.join('@' + c for c in SOURCE_CHATS)}"
     )
-    
+
     client = TelegramClient(StringSession(SESSION_STRING), API_ID, API_HASH)
     await client.connect()
-    
+
     while True:
-        try:
-            await check_once(client)
-            print("⏳ Следующая проверка через час...")
-            await asyncio.sleep(CHECK_INTERVAL)
-        except Exception as e:
-            print(f"❌ Ошибка в основном цикле: {e}")
-            await asyncio.sleep(60)
+        await check_once(client)
+        print("⏳ Следующая проверка через час...")
+        await asyncio.sleep(CHECK_INTERVAL)
 
 if __name__ == "__main__":
     asyncio.run(main())
