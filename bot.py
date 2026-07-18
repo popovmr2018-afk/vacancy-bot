@@ -21,7 +21,7 @@ SOURCE_CHATS = [
 ]
 
 SENT_FILE = "/tmp/sent_vacancies.json"
-CHECK_INTERVAL = 3600
+CHECK_INTERVAL = 1800
 
 def load_sent():
     if os.path.exists(SENT_FILE):
